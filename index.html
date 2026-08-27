@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SNN シンギュラリティニュース</title>
+<meta name="description" content="押すたびに存在しないニュースが流れます。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="SNN シンギュラリティニュース">
+<meta property="og:description" content="押すたびに存在しないニュースが流れます。本日も肉が不足。">
+<meta property="og:url" content="https://wineastwind.github.io/hackathon0827/">
+<meta property="og:image" content="https://wineastwind.github.io/hackathon0827/anchor.png">
+<meta property="og:image:width" content="1673">
+<meta property="og:image:height" content="941">
+<meta property="og:site_name" content="SNN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SNN シンギュラリティニュース">
+<meta name="twitter:description" content="押すたびに存在しないニュースが流れます。本日も肉が不足。">
+<meta name="twitter:image" content="https://wineastwind.github.io/hackathon0827/anchor.png">
+<meta name="theme-color" content="#e60012">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
@@ -122,6 +136,17 @@
   .next:active{transform:translateY(4px);box-shadow:0 0 0 #7a0009,0 2px 8px rgba(230,0,18,.3)}
   .next:focus-visible{outline:3px solid #fff;outline-offset:3px}
 
+  .share{display:flex;gap:8px}
+  .sbtn{
+    font-family:inherit;font-weight:900;font-size:13px;letter-spacing:.04em;
+    color:#c9d2e2;background:#191b22;border:1px solid #333846;
+    border-radius:5px;padding:10px 16px;cursor:pointer;
+    transition:background .12s,color .12s;
+  }
+  .sbtn:hover{background:#22252e;color:#fff}
+  .sbtn:focus-visible{outline:3px solid #fff;outline-offset:3px}
+  .sbtn.done{background:#00913a;border-color:#00913a;color:#fff}
+
   @media (prefers-reduced-motion:reduce){
     .anim-in .head,.anim-in .lead{animation:none}
     .ticker span{animation:none;padding-left:0}
@@ -144,9 +169,12 @@
 </div>
 
 <div class="panel">
-  <div class="hint">画面クリックでも切り替わります　/　Space・→キー対応</div>
+  <div class="share">
+    <button class="sbtn" id="copy">この速報のリンクをコピー</button>
+  </div>
   <button class="next" id="next">▶　次のニュース</button>
 </div>
+<div class="panel"><div class="hint">画面クリックでも切り替わります　/　Space・→キー対応</div></div>
 
 <script>
 /* ===================== データ ===================== */
@@ -222,15 +250,38 @@ const TICKER=[
 
 /* ===================== 生成 ===================== */
 const pick=a=>a[Math.floor(Math.random()*a.length)];
+const ri=a=>Math.floor(Math.random()*a.length);
 const shuffle=a=>[...a].sort(()=>Math.random()-.5);
 
-function makeTitle(){
-  const n=Math.floor(Math.random()*3);           // 修飾 0〜2個・重複なし
-  const mods=shuffle(MOD).slice(0,n).join("");
-  return mods+pick(SUBJ)+pick(ACT)+pick(END);
+/* 現在表示中のニュースを表すシード（配列） */
+let seed=null;
+
+function makeSeed(){
+  const n=Math.floor(Math.random()*3);                      // 修飾 0〜2個
+  const mods=shuffle(MOD.map((_,i)=>i)).slice(0,n);         // 重複なしの添字
+  return [ri(CATS),ri(SUBJ),ri(ACT),ri(END),ri(PLACE),ri(COMMENT),mods];
 }
-function makeLead(){
-  return `${pick(PLACE)}で確認された。関係者は「${pick(COMMENT)}」としている。`;
+
+function render(s){
+  const cat=CATS[s[0]]||CATS[0];
+  document.documentElement.style.setProperty("--cat",cat.color);
+  document.getElementById("badge").textContent=cat.name;
+  document.getElementById("title").textContent=
+    (s[6]||[]).map(i=>MOD[i]).join("")+SUBJ[s[1]]+ACT[s[2]]+END[s[3]];
+  document.getElementById("lead").textContent=
+    `${PLACE[s[4]]}で確認された。関係者は「${COMMENT[s[5]]}」としている。`;
+}
+
+/* シード ⇔ 文字列 */
+const seedToStr=s=>[s[0],s[1],s[2],s[3],s[4],s[5],(s[6]||[]).join("-")].join(".");
+function strToSeed(str){
+  const p=String(str).split(".");
+  if(p.length<6)return null;
+  const num=(v,arr)=>{const n=parseInt(v,10);return Number.isInteger(n)&&n>=0&&n<arr.length?n:null};
+  const s=[num(p[0],CATS),num(p[1],SUBJ),num(p[2],ACT),num(p[3],END),num(p[4],PLACE),num(p[5],COMMENT)];
+  if(s.some(v=>v===null))return null;
+  s.push((p[6]||"").split("-").map(v=>parseInt(v,10)).filter(n=>Number.isInteger(n)&&n>=0&&n<MOD.length));
+  return s;
 }
 
 /* ===================== 時刻 ===================== */
@@ -263,28 +314,47 @@ function chime(){
 
 /* ===================== 更新 ===================== */
 const lower=document.getElementById("lower");
-function nextNews(){
-  const cat=pick(CATS);
-  document.documentElement.style.setProperty("--cat",cat.color);
-  document.getElementById("badge").textContent=cat.name;
-  document.getElementById("title").textContent=makeTitle();
-  document.getElementById("lead").textContent=makeLead();
+function show(s,silent){
+  seed=s;
+  render(s);
+  history.replaceState(null,"","?n="+seedToStr(s));
   tickClock();
-  chime();
+  if(!silent)chime();
   lower.classList.remove("anim-in");
   void lower.offsetWidth;                        // アニメ再生のため強制リフロー
   lower.classList.add("anim-in");
 }
+function nextNews(){show(makeSeed())}
 
 /* 起動 */
 document.getElementById("tickerText").textContent=shuffle(TICKER).join("　　◆　　");
 document.getElementById("ticker").style.display="block";
 tickClock();
 
+const fromURL=strToSeed(new URLSearchParams(location.search).get("n")||"");
+if(fromURL){seed=fromURL;render(fromURL)}   // 共有リンクから開いた場合は音を鳴らさず復元
+
 document.getElementById("next").addEventListener("click",e=>{e.stopPropagation();nextNews()});
 document.getElementById("tv").addEventListener("click",nextNews);
 document.addEventListener("keydown",e=>{
   if(e.code==="Space"||e.code==="ArrowRight"){e.preventDefault();nextNews()}
+});
+
+/* ===================== 共有 ===================== */
+document.getElementById("copy").addEventListener("click",async e=>{
+  e.stopPropagation();
+  const b=e.currentTarget;
+  const url=location.origin+location.pathname+(seed?"?n="+seedToStr(seed):"");
+  try{
+    await navigator.clipboard.writeText(url);
+  }catch(err){
+    const ta=document.createElement("textarea");
+    ta.value=url;document.body.appendChild(ta);ta.select();
+    document.execCommand("copy");ta.remove();
+  }
+  b.textContent="コピーしました";
+  b.classList.add("done");
+  setTimeout(()=>{b.textContent="この速報のリンクをコピー";b.classList.remove("done")},1600);
 });
 </script>
 </body>
