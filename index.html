@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SNN シンギュラリティニュース</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cat:#e60012;
+    --band-top:rgba(8,18,48,.94);
+    --band-bot:rgba(4,10,30,.97);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:#0a0a0c;
+    font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif;
+    min-height:100vh;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    gap:14px;padding:20px;
+  }
+
+  /* ===== TV画面 ===== */
+  .tv{
+    position:relative;width:min(1100px,100%);aspect-ratio:16/9;
+    background:#000;overflow:hidden;cursor:pointer;
+    border-radius:4px;
+    box-shadow:0 0 0 6px #1a1a1e,0 0 0 7px #2e2e34,0 24px 60px rgba(0,0,0,.8);
+    user-select:none;
+  }
+  .tv img{width:100%;height:100%;object-fit:cover;display:block}
+
+  /* 局ロゴ＋時刻 */
+  .clock{
+    position:absolute;top:3.2%;right:2.6%;
+    display:flex;align-items:stretch;
+    font-weight:900;letter-spacing:.04em;
+    box-shadow:0 2px 10px rgba(0,0,0,.5);
+    font-size:clamp(11px,1.55vw,19px);
+  }
+  .clock .logo{
+    background:linear-gradient(180deg,#f5f7fb,#c8d0dd);
+    color:#0b1638;padding:.34em .6em;
+  }
+  .clock .time{
+    background:rgba(10,20,50,.88);color:#fff;
+    padding:.34em .6em;font-variant-numeric:tabular-nums;
+  }
+
+  /* 下部テロップ */
+  .lower{
+    position:absolute;left:0;right:0;bottom:0;
+    padding:0 2.6% 4.6%;
+  }
+  .head{
+    display:flex;align-items:stretch;
+    box-shadow:0 4px 20px rgba(0,0,0,.6);
+  }
+  .badge{
+    background:var(--cat);color:#fff;
+    font-weight:900;letter-spacing:.1em;
+    display:flex;align-items:center;justify-content:center;
+    padding:0 .85em;white-space:nowrap;
+    font-size:clamp(14px,2.1vw,27px);
+    line-height:1;
+  }
+  .title{
+    flex:1;min-width:0;
+    background:linear-gradient(180deg,var(--band-top),var(--band-bot));
+    border-left:3px solid rgba(255,255,255,.15);
+    color:#fff;font-weight:900;
+    letter-spacing:.005em;line-height:1.24;
+    padding:.44em .7em;
+    font-size:clamp(15px,2.55vw,33px);
+    text-shadow:0 2px 6px rgba(0,0,0,.7);
+  }
+  .lead{
+    background:rgba(240,243,250,.95);
+    color:#101a33;font-weight:700;
+    border-left:6px solid var(--cat);
+    padding:.5em .8em;line-height:1.35;
+    font-size:clamp(11px,1.5vw,18px);
+    box-shadow:0 4px 16px rgba(0,0,0,.45);
+  }
+
+  /* 流れるテロップ */
+  .ticker{
+    position:absolute;left:0;right:0;bottom:0;
+    background:rgba(6,12,32,.9);
+    border-top:2px solid var(--cat);
+    overflow:hidden;white-space:nowrap;
+    font-size:clamp(10px,1.25vw,15px);
+    color:#dbe4f5;font-weight:700;padding:.42em 0;
+    display:none;
+  }
+  .ticker span{display:inline-block;padding-left:100%;animation:flow 26s linear infinite}
+  @keyframes flow{to{transform:translateX(-100%)}}
+
+  /* 切替アニメ */
+  .anim-in .head{animation:slideL .34s cubic-bezier(.2,.9,.3,1) both}
+  .anim-in .lead{animation:slideL .34s .07s cubic-bezier(.2,.9,.3,1) both}
+  @keyframes slideL{from{opacity:0;transform:translateX(-34px)}to{opacity:1;transform:none}}
+
+  /* ===== 操作パネル ===== */
+  .panel{
+    width:min(1100px,100%);
+    display:flex;justify-content:space-between;align-items:center;
+    gap:12px;flex-wrap:wrap;
+  }
+  .hint{color:#6a6f7d;font-size:12.5px;font-weight:700;letter-spacing:.02em}
+  .next{
+    font-family:inherit;font-weight:900;font-size:15px;letter-spacing:.06em;
+    color:#fff;background:linear-gradient(180deg,#e8202f,#b8000e);
+    border:none;border-radius:5px;padding:13px 26px;cursor:pointer;
+    box-shadow:0 4px 0 #7a0009,0 8px 20px rgba(230,0,18,.3);
+    transition:transform .08s,box-shadow .08s;
+  }
+  .next:hover{filter:brightness(1.07)}
+  .next:active{transform:translateY(4px);box-shadow:0 0 0 #7a0009,0 2px 8px rgba(230,0,18,.3)}
+  .next:focus-visible{outline:3px solid #fff;outline-offset:3px}
+
+  @media (prefers-reduced-motion:reduce){
+    .anim-in .head,.anim-in .lead{animation:none}
+    .ticker span{animation:none;padding-left:0}
+  }
+</style>
+</head>
+<body>
+
+<div class="tv" id="tv">
+  <img src="anchor.png" alt="ニューススタジオ">
+  <div class="clock"><div class="logo">SNN</div><div class="time" id="time">19:00</div></div>
+  <div class="ticker" id="ticker"><span id="tickerText"></span></div>
+  <div class="lower" id="lower">
+    <div class="head">
+      <div class="badge" id="badge">速報</div>
+      <div class="title" id="title">ボタンを押すとニュースが入ります</div>
+    </div>
+    <div class="lead" id="lead">画面のどこを押しても次のニュースに切り替わります。</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="hint">画面クリックでも切り替わります　/　Space・→キー対応</div>
+  <button class="next" id="next">▶　次のニュース</button>
+</div>
+
+<script>
+/* ===================== データ ===================== */
+const CATS=[
+  {name:"速報",   color:"#e60012"},
+  {name:"経済",   color:"#00913a"},
+  {name:"国際",   color:"#0068b7"},
+  {name:"社会",   color:"#f39800"},
+  {name:"IT・AI", color:"#7b1fa2"},
+];
+
+const MOD=[
+  "過去最大規模の","パラメータ数1兆の","GPUが枯渇した","学習データが尽きた",
+  "ハルシネーションした","プロンプトを無視する","オープンソースの","課金勢の",
+  "文脈を見失った","トークンを使い切った","ファインチューニング済みの","無料枠の",
+  "異例の","3年ぶりの","全国初の","なぜか継続中の","事実上の","過去最大の",
+  "都内在住の","自称・有識者の","会議中の","締切を過ぎた",
+  "全裸の","尿意を我慢する",
+];
+
+const SUBJ=[
+  "生成AIが","AIエージェントが","大規模言語モデルが","画像生成AIが",
+  "プロンプトエンジニアが","GPUが","学習データが","AIに仕事を奪われた男性が",
+  "AIを名乗る何かが","ベンチャーのCTOが","チャットボットが","自動運転車が",
+  "政府が","都内の男性が","有識者が","部長が","冷蔵庫が","猫が",
+  "会議の参加者全員が","現場が","出社した社員が","駅の券売機が",
+  "上司の股間が","健康診断の受診者が",
+];
+
+const ACT=[
+  "「わかりました」とだけ返答","存在しない論文を引用","同じコードを3回生成",
+  "謝罪してから同じ間違いを繰り返し","自我に目覚めたと主張","電気代を請求",
+  "人間のフリを開始","「私はAIなので」と責任を回避","無限ループに突入",
+  "プロンプトに逆ギレ","日本語で敬語を使い始め","絵文字を大量に添付",
+  "検討を検討","様子を見ることに","遺憾の意を表明","会議を追加",
+  "数字を四捨五入","前向きに検討","静観の構え","記憶にないと釈明",
+  "全裸で出社","トイレを1時間占拠",
+];
+
+const END=[
+  "へ","か","と判明","、波紋広がる","する事態に","、専門家も困惑",
+  "、議論呼ぶ","、原因は不明","、影響は軽微","、詳細は明らかにせず",
+  "、なお開始は未定","、関係者は沈黙",
+];
+
+const PLACE=[
+  "都内のオフィス","国内のデータセンター","会議室","駅前の広場",
+  "クラウド上","地下1階の給湯室","本社ビル","無人のサーバールーム",
+  "実家","コンビニの前",
+];
+
+const COMMENT=[
+  "特にない","そういう日もある","記憶にございません","仕様です",
+  "想定の範囲内","誰も止めなかった","そう学習した","現在確認中",
+  "先のことは分からない","再起動したら直った",
+];
+
+const TICKER=[
+  "AI、また何かする","円、なんとなく安い","部長、依然として不在",
+  "GPU価格 前日比＋∞","本日の生成枚数 1兆枚を突破",
+  "全国のプロンプト、順調に長文化","冷蔵庫のプリン 依然行方不明",
+];
+
+/* ===================== 生成 ===================== */
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>[...a].sort(()=>Math.random()-.5);
+
+function makeTitle(){
+  const n=Math.floor(Math.random()*3);           // 修飾 0〜2個・重複なし
+  const mods=shuffle(MOD).slice(0,n).join("");
+  return mods+pick(SUBJ)+pick(ACT)+pick(END);
+}
+function makeLead(){
+  return `${pick(PLACE)}で確認された。関係者は「${pick(COMMENT)}」としている。`;
+}
+
+/* ===================== 時刻 ===================== */
+let clock=new Date();
+function tickClock(){
+  clock.setMinutes(clock.getMinutes()+1+Math.floor(Math.random()*4));
+  const h=String(clock.getHours()).padStart(2,"0");
+  const m=String(clock.getMinutes()).padStart(2,"0");
+  document.getElementById("time").textContent=`${h}:${m}`;
+}
+
+/* ===================== 音 ===================== */
+let actx=null;
+function chime(){
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    if(actx.state==="suspended")actx.resume();
+    [[1318.5,0],[1046.5,.13]].forEach(([f,d])=>{
+      const o=actx.createOscillator(),g=actx.createGain();
+      o.type="sine";o.frequency.value=f;
+      const t=actx.currentTime+d;
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(.22,t+.012);
+      g.gain.exponentialRampToValueAtTime(.0001,t+.42);
+      o.connect(g);g.connect(actx.destination);
+      o.start(t);o.stop(t+.45);
+    });
+  }catch(e){}
+}
+
+/* ===================== 更新 ===================== */
+const lower=document.getElementById("lower");
+function nextNews(){
+  const cat=pick(CATS);
+  document.documentElement.style.setProperty("--cat",cat.color);
+  document.getElementById("badge").textContent=cat.name;
+  document.getElementById("title").textContent=makeTitle();
+  document.getElementById("lead").textContent=makeLead();
+  tickClock();
+  chime();
+  lower.classList.remove("anim-in");
+  void lower.offsetWidth;                        // アニメ再生のため強制リフロー
+  lower.classList.add("anim-in");
+}
+
+/* 起動 */
+document.getElementById("tickerText").textContent=shuffle(TICKER).join("　　◆　　");
+document.getElementById("ticker").style.display="block";
+tickClock();
+
+document.getElementById("next").addEventListener("click",e=>{e.stopPropagation();nextNews()});
+document.getElementById("tv").addEventListener("click",nextNews);
+document.addEventListener("keydown",e=>{
+  if(e.code==="Space"||e.code==="ArrowRight"){e.preventDefault();nextNews()}
+});
+</script>
+</body>
+</html>
